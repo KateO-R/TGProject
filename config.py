@@ -1,1 +1,3 @@
 TOKEN = '7862689982:AAHU3OZKsdDpVwNeayUnBs3ZWa9cKk51xrw'
+api_key = 'bfb2bef52e1935d5ff2a3156c9fc3402'
+TOKEN1 = ''
