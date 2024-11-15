@@ -2,26 +2,24 @@ import asyncio
 import logging
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart, Command
-from aiogram.types import Message, FSInputFile
+from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from config import TOKEN1
-import sqlite3
-import aiohttp
 import sqlite3
 
+from config import TOKEN1
 
 bot = Bot(token=TOKEN1)
-dp = Dispatcher()
+dp = Dispatcher(storage=MemoryStorage())
 
 logging.basicConfig(level=logging.INFO)
 
 class Form(StatesGroup):
     name = State()
     age = State()
-    city = State()
-
+    grade = State()
+    confirm = State()
 
 def init_db():
     conn = sqlite3.connect('school_data.db')
@@ -55,17 +53,39 @@ async def age(message: Message, state: FSMContext):
     await message.answer("What is your grade?")
     await state.set_state(Form.grade)
 
-@dp.message(Form.city)
+@dp.message(Form.grade)
 async def grade(message: Message, state: FSMContext):
     await state.update_data(grade=message.text)
     user_data = await state.get_data()
 
-    conn = sqlite3.connect('school_data.db')
-    cur = conn.cursor()
-    cur.execute('''
-INSERT INTO users (name, age, city) VALUES(?, ?, ?)''', (user_data['name'], user_data['age'], user_data['city']))
-    conn.commit()
-    conn.close()
+    confirmation_message = (
+        f"Please check the data you put in: your name is {user_data['name']}, "
+        f"{user_data['age']} years old, your grade is {user_data['grade']}. "
+        "Please type Yes if everything is correct and No if you need to correct your data."
+    )
+    await message.answer(confirmation_message)
+    await state.set_state(Form.confirm)
+
+@dp.message(Form.confirm)
+async def confirm(message: Message, state: FSMContext):
+    if message.text.lower() == 'yes':
+        user_data = await state.get_data()
+
+        conn = sqlite3.connect('school_data.db')
+        cur = conn.cursor()
+        cur.execute('''
+        INSERT INTO users (name, age, grade) VALUES(?, ?, ?)''',
+                    (user_data['name'], user_data['age'], user_data['grade']))
+        conn.commit()
+        conn.close()
+
+        await message.answer("Thank you, you are now in the school data list.")
+        await state.clear()
+    elif message.text.lower() == 'no':
+        await message.answer("Please try again. Press /start to begin.")
+        await state.clear()
+    else:
+        await message.answer("Please type Yes or No.")
 
 async def main():
     await dp.start_polling(bot)
